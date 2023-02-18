@@ -6,6 +6,7 @@
 #include <iostream>
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
+#include <unordered_map>
 
 // BMP - ARGB 16-bit
 // Where R = 5, G = 5, B = 5, A = 1
@@ -23,10 +24,22 @@ constexpr auto SEQUENCE = std::array<char, 9> {
 // clang-format on
 constexpr auto OUTPUT_FILE_EXTENSION { "png" };
 
-struct SeparatorPair {
-    size_t current { 0 };
-    size_t next { 0 };
+struct ImageFileInfo {
+    size_t separatorStartIndex { 0 };
+    sf::Vector2u bounds;
 };
+
+namespace std {
+template <>
+struct hash<sf::Vector2u> {
+    auto operator()(const sf::Vector2u& xyz) const -> size_t
+    {
+        const auto xHash = hash<size_t> {}(xyz.x);
+        const auto yHash = hash<size_t> {}(xyz.y);
+        return xHash ^ (yHash << 1);
+    }
+};
+} // namespace std
 
 // The bitmap colour format is 16-bit ARGB, whereas SFML will expect
 // the colours to be in the format of 32-bit RGBA, so we need to
@@ -41,24 +54,22 @@ std::array<uint8_t, 4> convertARGB16ToRGBA32(uint16_t p)
     return pixel;
 }
 
-std::vector<uint16_t> getImageData(const std::vector<char>& byteData, const SeparatorPair& separator)
+std::vector<uint16_t> getImageData(const std::vector<char>& byteData, const ImageFileInfo& imageInfo)
 {
-    assert(separator.current + SEPARATOR_LENGTH < byteData.size());
-    assert(separator.next < byteData.size());
-
     std::vector<uint16_t> imageData;
-
-    for (size_t i { separator.current + SEPARATOR_LENGTH }; i < separator.next - 1; i += 2) {
+    const auto size { (16 * (imageInfo.bounds.x * imageInfo.bounds.y)) / 8 };
+    const auto start { imageInfo.separatorStartIndex + SEPARATOR_LENGTH };
+    for (size_t i { 0 }; i < (size - 1); i += 2) {
         uint16_t pixel;
-        memcpy(&pixel, &byteData[i], 2 * sizeof(char));
+        memcpy(&pixel, &byteData[start + i], 2 * sizeof(char));
         imageData.push_back(pixel);
     }
     return imageData;
 }
 
-void saveToDisk(std::string_view filename, const std::vector<uint16_t>& pixelData)
+void saveToDisk(std::string_view filename, const std::vector<uint16_t>& pixelData, const sf::Vector2u& size)
 {
-    spdlog::debug("We have {} pixels ", pixelData.size());
+    // spdlog::debug("We have {} pixels ", pixelData.size());
 
     std::vector<uint8_t> convertedPixelData;
     for (auto p : pixelData) {
@@ -69,9 +80,9 @@ void saveToDisk(std::string_view filename, const std::vector<uint16_t>& pixelDat
 
     sf::Image img;
     // For now we hardcode to 64x64
-    img.create({ 64, 64 }, convertedPixelData.data());
+    img.create(size, convertedPixelData.data());
     if (!img.saveToFile(filename)) {
-        spdlog::error("Unable to save to file!");
+        spdlog::error("Unable to save to file {} with size [{}, {}] to disk", filename, size.x, size.y);
         assert(false);
     }
 }
@@ -129,7 +140,7 @@ int main(int argc, char* argv[])
     // if we find it, we'll add the separators ID to an array which we use
     // afterwards to extract the images.
     std::vector<size_t> allSeparatorLocations;
-    std::vector<SeparatorPair> separatorUniform64Images; // Separator pairs that denote a 64x64 image data block
+
     for (size_t i { 0 }; i < rawByteData.size(); ++i) {
         std::array<char, SEQUENCE.size()> buff;
         bool doesMatch = true;
@@ -152,32 +163,37 @@ int main(int argc, char* argv[])
 
     std::vector<uint16_t> imageData; // here we treat the pixel data as unsigned 16-bit integers
 
-    // Okay we now know the offsets in the raw file data to each separator, great right? Well not quite...
-    // For now we just want 64x64 images, and we also need to pair separators since
-    // the offset_start + separator_size = image data start, offset_end = image data end.
+    // Okay we now know the locations of all separators in the packed file, let's identify the width
+    // and height of each image and create a list of all images (organised by their dimension) that
+    // we need to extract
+    using ImageFileInfoList = std::vector<ImageFileInfo>;
+    std::unordered_map<sf::Vector2u, ImageFileInfoList> entriesPerSize;
 
-    // TODO handle verifying size of final separator since it has no partner
     for (size_t i { 0 }; i < allSeparatorLocations.size(); ++i) {
         if (i > allSeparatorLocations.size() - 2)
             break;
 
-        const auto distance { (allSeparatorLocations[i + 1] - allSeparatorLocations[i]) - SEPARATOR_LENGTH };
-        // for now we just wanna see the 64x64 images
-        if (distance == 8192) {
-            spdlog::debug("Distance {} for separator {:x} & {:x} therefore 64 x 64 image found",
-                          distance,
-                          allSeparatorLocations[i],
-                          allSeparatorLocations[i + 1]);
-            separatorUniform64Images.push_back({ allSeparatorLocations[i], allSeparatorLocations[i + 1] });
-        }
+        uint16_t width = 0;
+        uint16_t height = 0;
+        const auto sepPos = allSeparatorLocations[i];
+
+        // TODO swap to memcpy_s for safety...
+        memcpy(&width, &rawByteData[sepPos + 0x2C], sizeof(uint16_t));
+        memcpy(&height, &rawByteData[sepPos + 0x2C + sizeof(uint16_t)], sizeof(uint16_t));
+
+        entriesPerSize[sf::Vector2u { width, height }].push_back({ allSeparatorLocations[i], { width, height } });
     }
 
-    int id = 0;
-    for (auto& pair : separatorUniform64Images) {
-        UNUSED_VAR(pair);
-        imageData.clear();
-        imageData = getImageData(rawByteData, pair);
-        saveToDisk(fmt::format("Test_{}.{}", id, OUTPUT_FILE_EXTENSION), imageData);
-        ++id;
+    for (auto& [k, v] : entriesPerSize) {
+        int id = 0;
+        for (const auto& pair : v) {
+            UNUSED_VAR(pair);
+            imageData.clear();
+            imageData = getImageData(rawByteData, pair);
+            // Name the file with the format width_height_id.format
+            saveToDisk(
+                fmt::format("{}_{}.{}", fmt::format("{}x{}", k.x, k.y), id, OUTPUT_FILE_EXTENSION), imageData, k);
+            ++id;
+        }
     }
 }
