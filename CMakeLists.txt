@@ -1,20 +1,20 @@
 cmake_minimum_required(VERSION 3.21)
-project(sp-64-unpacker LANGUAGES CXX)
+project(sp64-tt LANGUAGES CXX)
 
 add_subdirectory(external)
-add_executable(sp-64-unpacker src/main.cpp)
-target_link_libraries(sp-64-unpacker PRIVATE spdlog SFML::Graphics)
-target_compile_features(sp-64-unpacker PRIVATE cxx_std_17)
+add_executable(sp64-tt src/main.cpp)
+target_link_libraries(sp64-tt PRIVATE spdlog SFML::Graphics)
+target_compile_features(sp64-tt PRIVATE cxx_std_17)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
-    target_compile_options(sp-64-unpacker PRIVATE -Werror -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
+    target_compile_options(sp64-tt PRIVATE -Werror -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    target_compile_options(sp-64-unpacker PRIVATE /W4 /WX /permissive-)
+    target_compile_options(sp64-tt PRIVATE /W4 /WX /permissive-)
 endif()
 
 if (WIN32 AND BUILD_SHARED_LIBS)
-    add_custom_command(TARGET sp-64-unpacker POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:sp-64-unpacker> $<TARGET_FILE_DIR:sp-64-unpacker> COMMAND_EXPAND_LISTS)
+    add_custom_command(TARGET sp64-tt POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:sp64-tt> $<TARGET_FILE_DIR:sp64-tt> COMMAND_EXPAND_LISTS)
 endif()
 
-install(TARGETS sp-64-unpacker)
+install(TARGETS sp64-tt)
