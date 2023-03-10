@@ -27,8 +27,12 @@ constexpr auto OUTPUT_FILE_EXTENSION { "png" };
 struct ImageFileInfo {
     size_t separatorStartIndex { 0 };
     sf::Vector2u bounds;
+    size_t byteOffset;
 };
 
+// This is a custom has function we use so we can hash the
+// sf::Vector2u structure (a 2D vector storing the x/y as
+// unsigned integers)
 namespace std {
 template <>
 struct hash<sf::Vector2u> {
@@ -181,7 +185,8 @@ int main(int argc, char* argv[])
         memcpy(&width, &rawByteData[sepPos + 0x2C], sizeof(uint16_t));
         memcpy(&height, &rawByteData[sepPos + 0x2C + sizeof(uint16_t)], sizeof(uint16_t));
 
-        entriesPerSize[sf::Vector2u { width, height }].push_back({ allSeparatorLocations[i], { width, height } });
+        entriesPerSize[sf::Vector2u { width, height }].push_back(
+            { allSeparatorLocations[i], { width, height }, sepPos });
     }
 
     for (auto& [k, v] : entriesPerSize) {
@@ -191,8 +196,13 @@ int main(int argc, char* argv[])
             imageData.clear();
             imageData = getImageData(rawByteData, pair);
             // Name the file with the format width_height_id.format
-            saveToDisk(
-                fmt::format("{}_{}.{}", fmt::format("{}x{}", k.x, k.y), id, OUTPUT_FILE_EXTENSION), imageData, k);
+            saveToDisk(fmt::format("{:x}_{}_{}.{}",
+                                   pair.separatorStartIndex,
+                                   fmt::format("{}x{}", k.x, k.y),
+                                   id,
+                                   OUTPUT_FILE_EXTENSION),
+                       imageData,
+                       k);
             ++id;
         }
     }
