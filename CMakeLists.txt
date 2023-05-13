@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.22)
 project(sp64-tt LANGUAGES CXX)
 
 add_subdirectory(external)
-add_executable(sp64-tt src/main.cpp
-                       src/Unpacker.cpp)
+add_executable(sp64-tt  src/main.cpp
+                        src/App.cpp
+                        src/Unpacker.cpp)
 target_link_libraries(sp64-tt PRIVATE spdlog SFML::Graphics ImGui-SFML::ImGui-SFML)
 target_compile_features(sp64-tt PRIVATE cxx_std_20)
 
