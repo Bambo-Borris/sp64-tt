@@ -6,6 +6,7 @@
 #include <SFML/Window/VideoMode.hpp>
 #include <imgui-SFML.h>
 #include <imgui.h>
+#include <imfilebrowser.h>
 #include <vector>
 
 constexpr auto WINDOW_TITLE { "SP64-TT" };
@@ -80,6 +81,27 @@ void App::updateUI()
         } else {
             m_failedExport = true;
         }
+    }
+    // Button to open a broswer to find the texture file.
+    // This is WIP don't mind the code makes no sense we debug as we go.
+    if (ImGui::Button("Browse"))
+    {
+        // Header Text.
+        fileDialog.SetTitle("Choose File");
+        // Sets file types we are restircted to.
+        fileDialog.SetTypeFilters({".tex"});
+        fileDialog.Open();
+    }
+
+    if (fileDialog.Display())
+    {
+        if (fileDialog.HasSelected())
+        {
+            // Sets the path to the file.
+            filePath = fileDialog.GetSelected().string();
+            fileDialog.ClearSelected();
+        }
+        fileDialog.Close();
     }
 
     // If we failed to export we'll display a text box saying so
