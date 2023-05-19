@@ -1,12 +1,14 @@
 #include "App.hpp"
 #include "Unpacker.hpp"
 
+#include <imgui-SFML.h>
+#include <imgui.h>
+
 #include <SFML/System/String.hpp>
 #include <SFML/Window/Event.hpp>
 #include <SFML/Window/VideoMode.hpp>
-#include <imgui-SFML.h>
-#include <imgui.h>
 #include <imfilebrowser.h>
+
 #include <vector>
 
 constexpr auto WINDOW_TITLE { "SP64-TT" };
@@ -23,7 +25,7 @@ App::App()
     m_renderWindow.create(fullscreenModes[1], WINDOW_TITLE);
     m_renderWindow.setFramerateLimit(TARGET_FPS);
 
-    if (!ImGui::SFML::Init(m_renderWindow)) 
+    if (!ImGui::SFML::Init(m_renderWindow))
         throw std::runtime_error("Unable to initialise ImGui");
 
     // Here's 2 theme options you can try that aren't the same as the default, uncomment one of them
@@ -82,27 +84,24 @@ void App::updateUI()
             m_failedExport = true;
         }
     }
+    ImGui::FileBrowser fileDialog;
     // Button to open a broswer to find the texture file.
     // This is WIP don't mind the code makes no sense we debug as we go.
-    if (ImGui::Button("Browse"))
-    {
+    if (ImGui::Button("Browse")) {
         // Header Text.
         fileDialog.SetTitle("Choose File");
         // Sets file types we are restircted to.
-        fileDialog.SetTypeFilters({".tex"});
+        fileDialog.SetTypeFilters({ ".tex" });
         fileDialog.Open();
     }
 
-    if (fileDialog.Display())
-    {
-        if (fileDialog.HasSelected())
-        {
-            // Sets the path to the file.
-            filePath = fileDialog.GetSelected().string();
-            fileDialog.ClearSelected();
-        }
-        fileDialog.Close();
+    fileDialog.Display();
+    if (fileDialog.HasSelected()) {
+        // Sets the path to the file.
+        auto filePath = fileDialog.GetSelected().string();
+        fileDialog.ClearSelected();
     }
+    fileDialog.Close();
 
     // If we failed to export we'll display a text box saying so
     if (m_failedExport) {
