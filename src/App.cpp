@@ -84,7 +84,8 @@ void App::updateUI()
             m_failedExport = true;
         }
     }
-    ImGui::FileBrowser fileDialog;
+
+    static ImGui::FileBrowser fileDialog;
     // Button to open a broswer to find the texture file.
     // This is WIP don't mind the code makes no sense we debug as we go.
     if (ImGui::Button("Browse")) {
@@ -101,7 +102,6 @@ void App::updateUI()
         auto filePath = fileDialog.GetSelected().string();
         fileDialog.ClearSelected();
     }
-    fileDialog.Close();
 
     // If we failed to export we'll display a text box saying so
     if (m_failedExport) {
