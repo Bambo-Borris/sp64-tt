@@ -85,7 +85,7 @@ void saveToDisk(std::string_view filename, const std::vector<uint16_t>& pixelDat
 
     sf::Image img;
     // For now we hardcode to 64x64
-    img.create(size, convertedPixelData.data());
+    img.resize(size, convertedPixelData.data());
     if (!img.saveToFile(filename)) {
         spdlog::error("Unable to save to file {} with size [{}, {}] to disk", filename, size.x, size.y);
         assert(false);
